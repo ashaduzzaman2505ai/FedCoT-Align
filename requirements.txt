@@ -6,6 +6,7 @@ accelerate>=1.2.0
 
 # --- Federated Learning ---
 flwr>=1.13.0
+opacus
 
 # --- Data & Math ---
 numpy>=1.26.0

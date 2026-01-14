@@ -1,3 +1,8 @@
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent))
+
 from utils.seeding import set_seed
 from utils.logging import setup_logging, log_metrics
 from utils.checkpointing import save_checkpoint
