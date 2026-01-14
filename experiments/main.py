@@ -12,7 +12,7 @@ from models.fedcot_model import FedCoTModel
 from fed.client import FedCoTClient
 from fed.server import start_server
 from fed.strategy import FedCoTAlignStrategy
-from utils.seeding import set_seed
+from utils.seed import set_seed
 from utils.logging import setup_logging, log_metrics
 from baselines.centralized_cot import run_centralized_cot
 # Import other baselines as needed

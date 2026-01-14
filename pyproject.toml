@@ -2,36 +2,29 @@
 name = "fedcot-align"
 version = "0.1.0"
 description = "Federated Alignment of Chain-of-Thought Reasoning for Hallucination Reduction"
-authors = ["Research Engineer <engineer@example.com>"]
+authors = ["Senior Research Engineer <research@example.com>"]
 readme = "README.md"
-packages = [{include = "fedcot_align"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-torch = ">=2.5.0"
-torchvision = ">=0.20.0"
-transformers = ">=4.48.0"
-flwr = ">=1.13.0"         # Updated Flower for improved simulation stability
-datasets = "^3.1.0"       # Using latest HF datasets for better streaming support
+torch = ">=2.4.0"
+transformers = ">=4.44.0"
+flwr = { extras = ["simulation"], version = ">=1.10.0" }
+datasets = ">=3.0.0"
 pyyaml = "^6.0.1"
+wandb = ">=0.17.0"
+scipy = "^1.13.0"
 numpy = "^1.26.0"
-scipy = "^1.12.0"
-scikit-learn = "^1.4.0"   # Required for Verifier AUROC and partitioning
-sentencepiece = "^0.2.0"  # Essential for T5/Llama tokenization
-evaluate = "^0.4.3"       # Standard NLP evaluation library
-rouge_score = "^0.1.2"    # Metric for GSM8K/HotpotQA
-accelerate = "^1.2.0"     # For efficient model loading on A100/T4
-tqdm = "^4.66.0"
-wandb = { version = "^0.18.0", optional = true }
-
-[tool.poetry.extras]
-tracking = ["wandb"]
+scikit-learn = "^1.5.0"
+sentencepiece = "^0.2.0"
+evaluate = "^0.4.2"
+rouge_score = "^0.1.2"
+accelerate = "^0.34.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
-black = "^24.1.0"
+black = "^24.0.0"
 isort = "^5.13.0"
-mypy = "^1.8.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
