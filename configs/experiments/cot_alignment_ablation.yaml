@@ -1,0 +1,8 @@
+# Ablation: Vary lambda2
+inherits: [../model.yaml, ../fl.yaml, ../datasets.yaml]
+
+loss_weights:
+  lambda2: [0.0, 0.25, 0.5, 1.0]  # Ablate alignment weight
+
+experiment:
+  name: "cot_alignment_ablation"

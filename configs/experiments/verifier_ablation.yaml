@@ -1,0 +1,8 @@
+# Ablation: Vary lambda1 or disable verifier
+inherits: [../model.yaml, ../fl.yaml, ../datasets.yaml]
+
+loss_weights:
+  lambda1: [0.0, 0.5, 1.0]  # Ablate verifier weight
+
+experiment:
+  name: "verifier_ablation"

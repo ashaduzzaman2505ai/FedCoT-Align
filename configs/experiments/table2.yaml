@@ -1,0 +1,6 @@
+# Table 2: Baselines comparison
+inherits: [../model.yaml, ../fl.yaml, ../datasets.yaml]
+
+experiment:
+  baselines: true  # Run all baselines
+  datasets: ["gsm8k"]  # Example: Focus on one for table

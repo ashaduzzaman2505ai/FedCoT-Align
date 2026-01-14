@@ -1,0 +1,31 @@
+# Base model configuration
+model:
+  name: "google/t5-small"  # Or "google/flan-t5-small"; abstraction for LLaMA via 'meta-llama/Llama-2-7b-hf'
+  hidden_size: 512  # Adjust based on model
+  num_layers: 8  # For t5-small
+  dropout: 0.1
+
+heads:
+  reasoning:  # Reasoning Head for latent CoT states
+    output_dim: 256
+  answer:  # Answer Head
+    output_dim: 512  # Vocab size or projection
+  verifier:  # Verifier Head for hallucination detection
+    num_classes: 2  # Binary: hallucination or not
+    hidden_dim: 128
+  projector:  # CoT Embedding Projector for FL alignment
+    embed_dim: 128  # Latent space for sharing
+
+loss_weights:
+  lambda1: 1.0  # L_verifier
+  lambda2: 0.5  # L_cot_alignment
+
+optimizer:
+  type: "adamw"
+  lr: 1e-4
+  weight_decay: 1e-2
+
+privacy:
+  dp_sgd: false  # Flag for optional DP-SGD
+  noise_multiplier: 1.0
+  max_grad_norm: 1.0

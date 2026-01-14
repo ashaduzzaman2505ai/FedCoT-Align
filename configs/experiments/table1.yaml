@@ -1,0 +1,6 @@
+# Table 1: Comparison across datasets
+inherits: [../model.yaml, ../fl.yaml, ../datasets.yaml]
+
+experiment:
+  datasets: ["gsm8k", "truthfulqa", "hotpotqa"]  # Run all
+  metrics: ["accuracy", "factscore", "auroc", "consistency", "comm_cost", "latency"]

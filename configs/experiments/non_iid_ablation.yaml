@@ -1,0 +1,9 @@
+# Ablation: Vary skew_level
+inherits: [../model.yaml, ../fl.yaml, ../datasets.yaml]
+
+partitioning:
+  skew_level: [0.1, 0.5, 1.0]  # List for ablation loop in ablation_study.py
+
+experiment:
+  name: "non_iid_ablation"
+  use_wandb: true

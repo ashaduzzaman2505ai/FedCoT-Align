@@ -1,0 +1,24 @@
+# Datasets configuration
+datasets:
+  - name: "gsm8k"
+    path: "gsm8k"  # Hugging Face dataset name
+    split: "train"  # Or "test"
+    subsample_ratio: 0.1  # 0.0-1.0 for subsetting on T4; 1.0 for full on A100
+    max_length: 512  # Tokenization max length
+
+  - name: "truthfulqa"
+    path: "truthful_qa"
+    split: "generation"  # For hallucination
+    subsample_ratio: 0.1
+    max_length: 512
+
+  - name: "hotpotqa"
+    path: "hotpot_qa"
+    split: "fullwiki"  # For multi-hop
+    subsample_ratio: 0.1
+    max_length: 1024  # Longer for multi-hop
+
+partitioning:
+  non_iid: true
+  skew_level: 0.5  # Dirichlet alpha; lower = more skew
+  domains_per_client: 1  # Each client sees one domain

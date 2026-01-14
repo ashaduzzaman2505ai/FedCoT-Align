@@ -1,0 +1,13 @@
+# Main results for Table 1: Full FedCoT-Align on all datasets
+inherits: [../model.yaml, ../fl.yaml, ../datasets.yaml]  # Conceptual; load/merge in code
+
+fl:
+  num_rounds: 100  # Full run for A100
+  batch_size: 32
+
+datasets:
+  - subsample_ratio: 1.0  # Full data
+
+experiment:
+  use_wandb: true
+  baselines: false  # Run main method

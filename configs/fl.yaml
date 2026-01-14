@@ -1,0 +1,15 @@
+# Federated Learning configuration
+fl:
+  algorithm: "FedAvg"  # Or others like FedProx in baselines
+  num_rounds: 50  # Total FL rounds
+  num_clients: 5  # Number of clients (agents); small for T4 tests
+  clients_per_round: 3  # Fraction or number selected per round
+  local_epochs: 1  # Local training epochs per client
+  batch_size: 16  # Tunable for GPU: small for T4, larger for A100
+  seed: 42  # For reproducibility
+
+communication:
+  share_embeddings: true  # Only CoT embeddings/gradients
+  share_raw_cot: false  # NEVER true
+
+async_mode: false  # Optional async FL, not required
