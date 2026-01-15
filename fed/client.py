@@ -25,34 +25,28 @@ class FedCoTClient(fl.client.NumPyClient):
         self.model.load_state_dict(state_dict, strict=True)
 
     def fit(self, parameters, config: Dict[str, Any]) -> Tuple[List[np.ndarray], int, Dict]:
-        self.set_parameters(parameters)
-        
-        # --- DECODE GLOBAL PROTOTYPE ---
-        if "global_prototype_bytes" in config:
-            # Reconstruct from bytes
-            proto_bytes = config["global_prototype_bytes"]
-            # We assume the dimension from our model config
-            dim = self.config['heads']['projector']['embed_dim']
-            proto_np = np.frombuffer(proto_bytes, dtype=np.float32).copy()
-            global_proto = torch.from_numpy(proto_np).to(self.device)
-        else:
-            global_proto = torch.zeros(self.config['heads']['projector']['embed_dim'], device=self.device)
+            self.set_parameters(parameters)
             
-    
-        # Initialize/Update Trainer with current global consensus
-        trainer = LocalTrainer(self.config, self.model, self.trainloader, global_proto)
-        
-        # Train
-        metrics = trainer.train(epochs=self.config['fl']['local_epochs'])
-        
-        # Compute Local Prototype
-        local_proto = self._compute_local_prototype()
+            # Decode
+            if "global_prototype_bytes" in config:
+                proto_bytes = config["global_prototype_bytes"]
+                proto_np = np.frombuffer(proto_bytes, dtype=np.float32).copy()
+                global_proto = torch.from_numpy(proto_np).to(self.device)
+            else:
+                global_proto = torch.zeros(self.config['heads']['projector']['embed_dim'], device=self.device)
+                
+            trainer = LocalTrainer(self.config, self.model, self.trainloader, global_proto)
+            metrics = trainer.train(epochs=self.config['fl']['local_epochs'])
+            
+            # Local Prototype Calculation
+            local_proto = self._compute_local_prototype()
 
-        return self.get_parameters(), len(self.trainloader.dataset), {
-                "local_prototype": local_proto.cpu().numpy().tobytes(), # Send back as bytes
-                **metrics
-        }
-
+            # RETURN: Ensure local_prototype is bytes
+            return self.get_parameters(), len(self.trainloader.dataset), {
+                    "local_prototype": local_proto.cpu().numpy().astype(np.float32).tobytes(),
+                    **metrics
+            }
+            
     def _compute_local_prototype(self) -> torch.Tensor:
         self.model.eval()
         all_embeddings = []
