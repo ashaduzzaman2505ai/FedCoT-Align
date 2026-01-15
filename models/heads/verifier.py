@@ -5,11 +5,6 @@ class VerifierHead(nn.Module):
     """
     Verifier Head for hallucination detection.
     Performs binary classification on the fused hidden and reasoning states.
-
-    Args:
-        input_dim (int): Input dimension (hidden + cot).
-        hidden_dim (int): Hidden layer dim.
-        num_classes (int): 2 for binary.
     """
     def __init__(self, input_dim: int, hidden_dim: int, num_classes: int = 2):
         super().__init__()
@@ -21,13 +16,4 @@ class VerifierHead(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-    """
-    Forward pass.
-
-        Args:
-            x (torch.Tensor): Input features.
-
-        Returns:
-            torch.Tensor: Logits for hallucination classification.
-    """
         return self.net(x)

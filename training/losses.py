@@ -1,53 +1,38 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, torch.Tensor
+from typing import Dict
 
 class FedCoTLosses:
     """
-    Tripartite loss for FedCoT-Align.
-
+    Tripartite loss for FedCoT-Align:
     L_total = L_answer + λ1 * L_verifier + λ2 * L_cot_alignment
-
-    Args:
-        lambda1 (float): Weight for verifier loss.
-        lambda2 (float): Weight for alignment loss.
     """
-    def __init__(self, lambda1: float = 1.0, lambda2: float = 0.5):
-        self.lambda1 = lambda1
-        self.lambda2 = lambda2
-        self.answer_loss = nn.CrossEntropyLoss(ignore_index=-100)  # For seq2seq
-        self.verifier_loss = nn.BCEWithLogitsLoss()  # Binary for hallucination
+    def __init__(self, lambda_verifier: float = 0.5, lambda_align: float = 0.1):
+        self.lambda_v = lambda_verifier
+        self.lambda_a = lambda_align
+        # Binary Cross Entropy with Logits for Verifier (more stable than Sigmoid + BCE)
+        self.verifier_loss_fn = nn.BCEWithLogitsLoss()
 
-    def compute(self, outputs: Dict[str, torch.Tensor], labels: torch.Tensor, hallucination_labels: torch.Tensor,
+    def compute(self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor], 
                 global_prototype: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """
-        Compute all losses.
+        
+        # 1. L_answer: Use the T5 native loss if available, otherwise return 0
+        l_answer = outputs.get('loss', torch.tensor(0.0, device=global_prototype.device))
 
-        Args:
-            outputs (Dict[str, Tensor]): Model forward outputs.
-            labels (Tensor): Answer labels.
-            hallucination_labels (Tensor): Hallucination labels (binary).
-            global_prototype (Tensor): Global CoT prototype for alignment.
+        # 2. L_verifier: Binary classification of hallucination
+        # Ensure target is float and same shape as logits [Batch, 1]
+        target_v = batch['is_hallucination'].float().unsqueeze(-1)
+        l_verifier = self.verifier_loss_fn(outputs['verifier_logits'], target_v)
 
-        Returns:
-            Dict[str, Tensor]: Losses dict with 'total', 'answer', 'verifier', 'alignment'.
-        """
-        # L_answer: Shift labels for seq2seq
-        shift_logits = outputs['answer_logits'][:, :-1, :].contiguous()
-        shift_labels = labels[:, 1:].contiguous()
-        l_answer = self.answer_loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        # 3. L_cot_alignment: MSE to global prototype
+        cot_embedding = outputs['cot_embedding'] # [Batch, Embed_Dim]
+        # Expand prototype to match batch size
+        target_proto = global_prototype.unsqueeze(0).expand(cot_embedding.size(0), -1)
+        l_alignment = F.mse_loss(cot_embedding, target_proto)
 
-        # L_verifier
-        verifier_logits = outputs['verifier_logits'].squeeze(-1) if hallucination_labels.dim() == 1 else outputs['verifier_logits']
-        l_verifier = self.verifier_loss(verifier_logits, hallucination_labels.float())
-
-        # L_cot_alignment: MSE to global prototype
-        cot_embedding = outputs['cot_embedding']
-        l_alignment = F.mse_loss(cot_embedding, global_prototype.expand_as(cot_embedding))
-
-        # Total
-        l_total = l_answer + self.lambda1 * l_verifier + self.lambda2 * l_alignment
+        # Total Loss
+        l_total = l_answer + (self.lambda_v * l_verifier) + (self.lambda_a * l_alignment)
 
         return {
             'total': l_total,
