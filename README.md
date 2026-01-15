@@ -1,5 +1,5 @@
 # FedCoT-Align: Federated Latent Alignment for Reasoning Hallucination
-\n**[Under Development]**
+[Under Development]
 
 This repository contains the official implementation of **FedCoT-Align**, a federated learning framework designed to reduce hallucinations in Chain-of-Thought (CoT) reasoning through latent prototype alignment and hallucination verification.
 
