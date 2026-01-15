@@ -1,39 +1,33 @@
 import torch
 from torch.utils.data import DataLoader, ConcatDataset
 from typing import Dict, Any
-
 from models.fedcot_model import FedCoTModel
 from training.local_trainer import LocalTrainer
-from data.loaders import DatasetLoader
-from utils.logging import log_metrics
 
-def run_centralized_cot(config: Dict[str, Any]) -> Dict[str, float]:
+def run_centralized_cot(config: Dict[str, Any], datasets: List[torch.utils.data.Dataset]):
     """
-    Baseline 1: Centralized CoT
-    Train one model on concatenated full (non-partitioned) data.
+    Upper Bound: Train on the full combined dataset without FL overhead.
     """
-    # Load all datasets without partitioning
-    loader = DatasetLoader(
-        subsample_ratio=config['datasets'][0]['subsample_ratio'],
-        model_name=config['model']['name']
-    )
-    all_datasets = loader.load_datasets()
-    full_train = ConcatDataset([ds['train'] for ds in all_datasets])
+    # 1. Combine all client partitions into one big pool
+    full_train = ConcatDataset(datasets)
     train_loader = DataLoader(full_train, batch_size=config['fl']['batch_size'], shuffle=True)
-
+    
     model = FedCoTModel(config)
-    # Disable alignment (no global prototype)
+    
+    # 2. Setup Trainer with Alignment disabled (lambda_align = 0)
+    # We pass a dummy prototype because the code requires one, but we set weight to 0.
+    config['loss_weights']['lambda_align'] = 0.0 
+    
     trainer = LocalTrainer(
         config=config,
         model=model,
         dataloader=train_loader,
-        global_prototype=torch.zeros(config['heads']['projector']['embed_dim'])  # Dummy, ignored
+        global_prototype=torch.zeros(config['heads']['projector']['embed_dim'])
     )
-
-    # Override to disable alignment loss
-    trainer.losses.lambda2 = 0.0
-
-    metrics = trainer.train(local_epochs=config['fl']['num_rounds'] * config['fl']['local_epochs'])
-    log_metrics({"centralized_cot_final": metrics}, step=0)
-
-    return metrics
+    
+    # Total epochs = rounds * local_epochs to match FL compute budget
+    total_epochs = config['fl']['num_rounds'] * config['fl']['local_epochs']
+    
+    print(f"Starting Centralized Training for {total_epochs} epochs...")
+    metrics = trainer.train(epochs=total_epochs)
+    return model, metrics

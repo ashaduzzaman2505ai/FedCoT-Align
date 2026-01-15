@@ -38,9 +38,12 @@ class LocalTrainer:
         self.logger = logging.getLogger("fedcot")
 
     def train(self, epochs: int) -> Dict[str, float]:
+        if self.dataloader is None:
+            raise ValueError(f"Client dataloader is None. Ensure data partitioning is correct in client_fn.")
+
         self.model.train()
         final_metrics = {}
-
+        
         for epoch in range(epochs):
             running_metrics = {'total': 0.0, 'answer': 0.0, 'verifier': 0.0, 'alignment': 0.0}
             

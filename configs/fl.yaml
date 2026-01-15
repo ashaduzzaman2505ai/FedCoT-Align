@@ -1,10 +1,9 @@
-federated:
-  num_rounds: 20
-  num_clients: 10
-  fraction_fit: 0.5       # Sample 5 clients per round
-  local_epochs: 1
-  batch_size: 8           # Optimized for T4
-  strategy: "FedAvg"      # Core baseline
+experiment:
+  current_mode: "fedcot" # Options: fedcot, centralized, standard_fl, fedrag
+  baselines:
+    enabled: true
+    list: ["centralized_cot", "standard_fl"]
 
-simulation:
-  gpu_per_client: 0.2     # Allow 5 clients per T4 GPU
+loss_weights:
+  lambda_verifier: 0.5
+  lambda_align: 1.0  # Set to 0.0 automatically when running standard_fl

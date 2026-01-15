@@ -36,7 +36,8 @@ class FedCoTClient(fl.client.NumPyClient):
                 global_proto = torch.zeros(self.config['heads']['projector']['embed_dim'], device=self.device)
                 
             trainer = LocalTrainer(self.config, self.model, self.trainloader, global_proto)
-            metrics = trainer.train(epochs=self.config['fl']['local_epochs'])
+            epochs = self.config.get('fl', {}).get('local_epochs', self.config.get('local_epochs', 3))
+            metrics = trainer.train(epochs=epochs)
             
             # Local Prototype Calculation
             local_proto = self._compute_local_prototype()

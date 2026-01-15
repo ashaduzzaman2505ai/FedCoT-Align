@@ -1,35 +1,63 @@
 import yaml
 import copy
+import torch
+import gc
+import ray
 from typing import Dict, Any, List
-from experiments.main import load_and_merge_config, run_fedcot_align
-from utils.logging import log_metrics
+from experiments.main import run_fedcot_align
 
-def run_ablation(base_config_paths: List[str], ablation_key: str, values: List[Any]):
+def set_nested_value(config: Dict, key_path: str, value: Any):
+    """Update a nested dictionary using a dot-notated string (e.g., 'fl.num_rounds')."""
+    keys = key_path.split('.')
+    for key in keys[:-1]:
+        config = config.setdefault(key, {})
+    config[keys[-1]] = value
+
+def run_ablation_suite(base_configs: List[str], ablation_key: str, values: List[Any]):
     """
-    Run ablation by varying one config parameter (e.g., skew_level, lambda2).
+    Iteratively runs experiments by varying a single parameter.
     """
-    base_config = load_and_merge_config(base_config_paths)
+    # 1. Load base configuration
+    base_config = {}
+    for path in base_configs:
+        with open(path, 'r') as f:
+            base_config.update(yaml.safe_load(f))
 
     for val in values:
-        config = copy.deepcopy(base_config)
-        keys = ablation_key.split('.')
-        d = config
-        for k in keys[:-1]:
-            d = d.setdefault(k, {})
-        d[keys[-1]] = val
+        print(f"\n{'='*20}")
+        print(f"STARTING ABLATION: {ablation_key} = {val}")
+        print(f"{'='*20}\n")
 
-        print(f"Running ablation: {ablation_key} = {val}")
-        run_fedcot_align(config)
-        log_metrics({f"{ablation_key}": val, "ablation_run": True}, step=0)
+        # 2. Create an isolated copy for this run
+        current_config = copy.deepcopy(base_config)
+        set_nested_value(current_config, ablation_key, val)
+        
+        # 3. Update W&B group/name for tracking
+        if 'experiment' not in current_config:
+            current_config['experiment'] = {}
+        current_config['experiment']['run_name'] = f"ablate_{ablation_key}_{val}"
+
+        try:
+            # 4. Execute the FL simulation
+            run_fedcot_align(current_config)
+        except Exception as e:
+            print(f"❌ Ablation run failed for {val}: {e}")
+        finally:
+            # 5. CRITICAL: Cleanup to prevent OOM in subsequent runs
+            if ray.is_initialized():
+                ray.shutdown()
+            torch.cuda.empty_cache()
+            gc.collect()
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--ablation', type=str, required=True,
-                        help='Key to ablate, e.g., partitioning.skew_level or loss_weights.lambda2')
-    parser.add_argument('--values', nargs='+', type=float, required=True,
-                        help='Values to try')
+    parser = argparse.ArgumentParser(description="Automated Ablation Study Runner")
+    parser.add_argument('--ablation', type=str, required=True, 
+                        help="Dot-notated key: 'partitioning.skew_level' or 'loss_weights.lambda_align'")
+    parser.add_argument('--values', nargs='+', type=float, required=True, 
+                        help="List of numerical values to test")
+    
     args = parser.parse_args()
-
-    base_paths = ['configs/model.yaml', 'configs/fl.yaml', 'configs/datasets.yaml']
-    run_ablation(base_paths, args.ablation, args.values)
+    
+    config_paths = ['configs/model.yaml', 'configs/fl.yaml', 'configs/datasets.yaml']
+    run_ablation_suite(config_paths, args.ablation, args.values)
