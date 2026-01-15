@@ -2,59 +2,34 @@ import torch
 from typing import Dict, List, Any
 import numpy as np
 from sklearn.metrics import roc_auc_score
-from evaluate import load  # Hugging Face evaluate
+from evaluate import load
 
 class EvaluationMetrics:
-    """
-    Collection of core metrics: EM/Accuracy, ROUGE, Verifier AUROC.
-    """
     def __init__(self):
         self.rouge = load("rouge")
-        self.exact_match = load("exact_match")  # or implement manually
+        self.exact_match = load("exact_match")
 
-    def compute_em_accuracy(
-        self, predictions: List[str], references: List[str]
-    ) -> Dict[str, float]:
-        """
-        Exact Match and Accuracy.
-
-        Args:
-            predictions (List[str]): Model-generated answers.
-            references (List[str]): Ground truth.
-
-        Returns:
-            Dict[str, float]: {'exact_match': float, 'accuracy': float}
-        """
+    def compute_em_accuracy(self, predictions: List[str], references: List[str]) -> Dict[str, float]:
+        # Filter out empty strings to avoid crashes
+        if not predictions or not references:
+            return {"exact_match": 0.0, "accuracy": 0.0}
+            
         em_results = self.exact_match.compute(predictions=predictions, references=references)
-        accuracy = np.mean([p.strip().lower() == r.strip().lower() for p, r in zip(predictions, references)])
-        return {"exact_match": em_results["exact_match"], "accuracy": accuracy}
+        accuracy = np.mean([
+            p.strip().lower() == r.strip().lower() for p, r in zip(predictions, references)
+        ])
+        return {"exact_match": em_results["exact_match"], "accuracy": float(accuracy)}
 
-    def compute_rouge(
-        self, predictions: List[str], references: List[str]
-    ) -> Dict[str, float]:
-        """
-        ROUGE scores (ROUGE-1, ROUGE-2, ROUGE-L).
-
-        Returns:
-            Dict[str, float]: Rouge scores.
-        """
+    def compute_rouge(self, predictions: List[str], references: List[str]) -> Dict[str, float]:
+        # The 'evaluate' library returns a dict of floats directly in newer versions
         results = self.rouge.compute(predictions=predictions, references=references)
-        return {k: v.mid.fmeasure for k, v in results.items()}
+        return {k: float(v) for k, v in results.items()}
 
-    def compute_auroc(
-        self, verifier_logits: List[float], true_labels: List[int]
-    ) -> float:
-        """
-        AUROC for hallucination verifier.
-
-        Args:
-            verifier_logits (List[float]): Raw logits or probabilities.
-            true_labels (List[int]): Binary ground truth (1 = hallucination).
-
-        Returns:
-            float: AUROC score.
-        """
+    def compute_auroc(self, verifier_logits: List[float], true_labels: List[int]) -> float:
         if len(set(true_labels)) < 2:
-            return 0.5  # Degenerate case
-        probs = torch.sigmoid(torch.tensor(verifier_logits)).numpy()
-        return roc_auc_score(true_labels, probs)
+            return 0.5  # Neutral score for single-class batches
+        
+        # Ensure we are dealing with probabilities
+        logits_tensor = torch.tensor(verifier_logits)
+        probs = torch.sigmoid(logits_tensor).numpy()
+        return float(roc_auc_score(true_labels, probs))

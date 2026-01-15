@@ -1,43 +1,47 @@
+import torch
 from typing import List, Dict
 from transformers import pipeline
 import numpy as np
+import re
 
 class FactScoreEvaluator:
     """
-    Lightweight FACTScore approximation using NLI model.
-    Decomposes claim into atomic facts → checks entailment against reference.
-
-    Args:
-        nli_model (str): e.g., "roberta-large-mnli"
+    Refined FACTScore proxy using sentence-level NLI decomposition.
     """
     def __init__(self, nli_model: str = "roberta-large-mnli"):
-        self.nli = pipeline("text-classification", model=nli_model, device=0 if torch.cuda.is_available() else -1)
+        device = 0 if torch.cuda.is_available() else -1
+        self.nli = pipeline("text-classification", model=nli_model, device=device)
 
-    def compute_factscore(
-        self, generations: List[str], references: List[str], decompose: bool = False
-    ) -> Dict[str, float]:
-        """
-        Approximate FACTScore: fraction of generated sentences entailed by reference.
+    def _split_sentences(self, text: str) -> List[str]:
+        # Basic regex split for sentences
+        sentences = re.split(r'(?<=[.!?]) +', text)
+        return [s.strip() for s in sentences if len(s.strip()) > 5]
 
-        Args:
-            generations (List[str]): Model outputs.
-            references (List[str]): Ground truth contexts/answers.
-            decompose (bool): If True, attempt sentence decomposition (simplified here).
-
-        Returns:
-            Dict[str, float]: {'factscore': mean score, 'supporting_ratio': ...}
-        """
-        scores = []
+    def compute_factscore(self, generations: List[str], references: List[str]) -> Dict[str, float]:
+        all_instance_scores = []
+        
         for gen, ref in zip(generations, references):
-            # Simple version: treat full generation vs reference as premise-hypothesis
-            # In full FACTScore, decompose into atomic facts → NLI per fact
-            result = self.nli(f"{gen} [SEP] {ref}")
-            entailment_score = next((r['score'] for r in result if r['label'] == 'ENTAILMENT'), 0.0)
-            contradiction_score = next((r['score'] for r in result if r['label'] == 'CONTRADICTION'), 0.0)
-            score = entailment_score - contradiction_score
-            scores.append(max(0.0, score))  # Normalized [0,1]
-
-        mean_score = np.mean(scores)
-        return {"factscore": float(mean_score), "factscore_std": float(np.std(scores))}
-
-# Usage: evaluator = FactScoreEvaluator(); score = evaluator.compute_factscore(gens, refs)
+            sentences = self._split_sentences(gen)
+            if not sentences:
+                all_instance_scores.append(0.0)
+                continue
+            
+            # Check entailment for each sentence (atomic fact) against the reference
+            sent_scores = []
+            for sent in sentences:
+                # NLI expects format: premise [SEP] hypothesis (context [SEP] claim)
+                # Pipeline handle: {"text": premise, "text_pair": hypothesis}
+                result = self.nli({"text": ref, "text_pair": sent})
+                
+                # Roberta MNLI labels: 0: contradiction, 1: neutral, 2: entailment
+                # We normalize: Entailment = 1, others = 0
+                label = result['label'].upper()
+                score = 1.0 if "ENTAIL" in label else 0.0
+                sent_scores.append(score)
+            
+            all_instance_scores.append(np.mean(sent_scores))
+            
+        return {
+            "factscore": float(np.mean(all_instance_scores)),
+            "factscore_std": float(np.std(all_instance_scores))
+        }
