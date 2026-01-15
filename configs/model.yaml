@@ -11,7 +11,7 @@ heads:
     output_dim: 256      # This was missing and caused the KeyError
   verifier:
     hidden_dim: 256
-    num_classes: 2       # Added to match model initialization
+    num_classes: 1       # Added to match model initialization
     dropout: 0.1
   projector:
     embed_dim: 128       # Changed from 'projection_dim' to 'embed_dim' to match your Step 4 code

@@ -15,10 +15,15 @@ class LocalTrainer:
         self.config = config
         self.model = model
         self.dataloader = dataloader
-        self.global_prototype = global_prototype
+        
+        # --- DEVICE FIX ---
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        # Pull weights from config correctly
+        # Ensure the global prototype is on the SAME device as the model
+        self.global_prototype = global_prototype.to(self.device)
+        self.model.to(self.device)
+        # ------------------
+        
         self.losses = FedCoTLosses(
             lambda_verifier=config['loss_weights']['lambda_verifier'],
             lambda_align=config['loss_weights']['lambda_align']
@@ -30,19 +35,21 @@ class LocalTrainer:
             weight_decay=float(config['optimizer']['weight_decay'])
         )
         
-        self.model.to(self.device)
         self.logger = logging.getLogger("fedcot")
 
     def train(self, epochs: int) -> Dict[str, float]:
         self.model.train()
-        epoch_metrics = {}
+        final_metrics = {}
 
         for epoch in range(epochs):
             running_metrics = {'total': 0.0, 'answer': 0.0, 'verifier': 0.0, 'alignment': 0.0}
             
             for batch in self.dataloader:
-                # Move batch to device
-                batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+                # Move all batch tensors to the correct device (GPU)
+                batch = {
+                    k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
+                    for k, v in batch.items()
+                }
                 
                 self.optimizer.zero_grad()
                 
@@ -53,20 +60,19 @@ class LocalTrainer:
                     labels=batch['labels']
                 )
                 
-                # Compute Tripartite Loss
+                # Compute Tripartite Loss 
+                # (Inside compute, all tensors: outputs, batch, and global_prototype are now on GPU)
                 loss_dict = self.losses.compute(outputs, batch, self.global_prototype)
                 
                 # Backward pass
                 loss_dict['total'].backward()
                 self.optimizer.step()
                 
-                # Update counters
                 for k in running_metrics:
                     running_metrics[k] += loss_dict[k].item()
 
-            # Average metrics for the epoch
             n = len(self.dataloader)
-            epoch_metrics = {f"train_{k}": v / n for k, v in running_metrics.items()}
-            log_metrics(epoch_metrics, step=epoch)
+            final_metrics = {f"train_{k}": v / n for k, v in running_metrics.items()}
+            log_metrics(final_metrics, step=epoch)
 
-        return epoch_metrics
+        return final_metrics

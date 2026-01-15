@@ -6,7 +6,7 @@ class VerifierHead(nn.Module):
     Verifier Head for hallucination detection.
     Performs binary classification on the fused hidden and reasoning states.
     """
-    def __init__(self, input_dim: int, hidden_dim: int, num_classes: int = 2):
+    def __init__(self, input_dim: int, hidden_dim: int, num_classes: int = 1):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
