@@ -27,14 +27,18 @@ class FedCoTClient(fl.client.NumPyClient):
     def fit(self, parameters, config: Dict[str, Any]) -> Tuple[List[np.ndarray], int, Dict]:
         self.set_parameters(parameters)
         
-        # --- RECEIVE GLOBAL PROTOTYPE FROM SERVER ---
-        # Strategy passes this as a list in the config dict
-        proto_list = config.get("global_prototype")
-        if proto_list:
-            global_proto = torch.tensor(proto_list, device=self.device)
+        # --- DECODE GLOBAL PROTOTYPE ---
+        if "global_prototype_bytes" in config:
+            # Reconstruct from bytes
+            proto_bytes = config["global_prototype_bytes"]
+            # We assume the dimension from our model config
+            dim = self.config['heads']['projector']['embed_dim']
+            proto_np = np.frombuffer(proto_bytes, dtype=np.float32).copy()
+            global_proto = torch.from_numpy(proto_np).to(self.device)
         else:
             global_proto = torch.zeros(self.config['heads']['projector']['embed_dim'], device=self.device)
-
+            
+    
         # Initialize/Update Trainer with current global consensus
         trainer = LocalTrainer(self.config, self.model, self.trainloader, global_proto)
         
@@ -43,10 +47,10 @@ class FedCoTClient(fl.client.NumPyClient):
         
         # Compute Local Prototype
         local_proto = self._compute_local_prototype()
-        
+
         return self.get_parameters(), len(self.trainloader.dataset), {
-            "local_prototype": local_proto.tolist(), # Serialize for Flower transport
-            **metrics
+                "local_prototype": local_proto.cpu().numpy().tobytes(), # Send back as bytes
+                **metrics
         }
 
     def _compute_local_prototype(self) -> torch.Tensor:

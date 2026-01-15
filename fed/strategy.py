@@ -1,9 +1,9 @@
+import io
 from flwr.server.strategy import FedAvg
 from flwr.common import Scalar, FitRes, Parameters, parameters_to_ndarrays, ndarrays_to_parameters
 import torch
 import numpy as np
 from typing import List, Tuple, Dict, Optional
-
 
 
 class FedCoTAlignStrategy(FedAvg):
@@ -12,12 +12,16 @@ class FedCoTAlignStrategy(FedAvg):
         self.global_prototype = global_prototype_init
 
     def configure_fit(self, server_round, parameters, client_manager):
-        """Send the Global Prototype to clients via the config dict."""
+        # Convert prototype to bytes for Flower compatibility
+        proto_np = self.global_prototype.detach().cpu().numpy()
+        proto_bytes = proto_np.tobytes() 
+        
         config = {
-            "global_prototype": self.global_prototype.tolist(),
+            "global_prototype_bytes": proto_bytes, # Send as bytes
+            "proto_shape": list(proto_np.shape),   # Shapes are usually small lists, but let's use a string or tuple if needed
             "server_round": server_round
         }
-        # Use standard FedAvg to sample clients
+        
         instructions = super().configure_fit(server_round, parameters, client_manager)
         for _, fit_ins in instructions:
             fit_ins.config.update(config)
